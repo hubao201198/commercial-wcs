@@ -15,28 +15,36 @@ PR #2 restored the first control safety kernel with CI PASS:
 - trusted device-position confirmation as the only physical-resource release path;
 - Go test/vet plus frontend build CI.
 
-## Current PR: domain + lifecycle recovery
+PR #3 restored the production domain/lifecycle boundary with CI PASS:
 
-`feature/rebuild-domain-lifecycle` restores a typed Go production domain boundary for Device, Task and Alarm and begins safe lifecycle recovery:
+- Device / Task / Alarm models and AUTO/MANUAL/MAINTENANCE device modes;
+- deadline and bounded retry semantics;
+- UNKNOWN MOVE is non-retryable;
+- cancellation is a request rather than a physical-state rewrite;
+- compensation/recovery requires trusted non-empty physical position.
 
-- explicit device AUTO/MANUAL/MAINTENANCE modes and trusted-position state;
-- task deadlines and bounded retry policy;
-- UNKNOWN MOVE transitions to UNKNOWN and is never eligible for blind retry;
-- running cancellation is a request, not an immediate physical-state rewrite;
-- cancellation/UNKNOWN recovery cannot enter compensation until a trusted non-empty device position is available;
-- regression tests cover deadline expiry, retry budget, UNKNOWN MOVE no-replay, and trusted-position compensation gates.
+## Current PR: segmented MOVE safety
 
-This PR intentionally does not claim failover, compensation completion, segmented MOVE, adapter/protocol support, persistence, or hardware SAT yet.
+`feature/rebuild-segmented-move` restores the next P0 control primitive:
+
+- MOVE is dispatched one physical segment at a time and cannot advance until destination-node confirmation;
+- two-segment destination lookahead is exposed for atomic reservation by the existing ReservationManager;
+- only trusted confirmation of the exact commanded destination advances the path and returns release authority for the previous trusted node;
+- UNKNOWN segment outcome stops progression, exposes no further lookahead, does not change confirmed position and cannot be blindly redispatched;
+- malformed paths, untrusted confirmations and mismatched-node confirmations fail closed;
+- deterministic regression tests cover lookahead, confirmation gating, UNKNOWN no-replay and trusted incremental release authority.
+
+This PR does not yet claim dynamic reroute, failover takeover, adapter/protocol support, persistence or hardware SAT.
 
 ## Commercial benchmark delta
 
-Fresh public benchmark review on 2026-09-24 confirms the priority. GALAXIS RCS 3.0 combines planning, simulation, virtual commissioning, control, scheduling and O&M with 2D/3D digital twin and space-time coordination. BlueSword IMHS-WCS/3D-SCADA combines heterogeneous equipment control, material-position visibility, fault localization and virtual simulation. Damon WCS reports millisecond scheduling, heterogeneous equipment integration and large project deployment, while its newer systems combine shuttles and AMRs with swarm/path scheduling. Quicktron exposes WES/LES/RCS integration with upstream WMS/ERP/MES and robot traffic/path control.
+Fresh public benchmark review on 2026-09-24 continues to support the control-first recovery order. GALAXIS RCS 3.0 combines planning, simulation, virtual commissioning, control, scheduling and O&M with 2D/3D digital twin and space-time coordination. BlueSword IMHS-WCS/3D-SCADA combines heterogeneous equipment control, material-position visibility, fault localization and virtual simulation. Damon combines heterogeneous conveyor/shuttle/AMR equipment with high-throughput scheduling and large-project delivery. Quicktron exposes WES/LES/RCS integration with upstream WMS/ERP/MES plus robot traffic/path control.
 
-The rebuilt repository remains far behind these commercial delivery baselines. The current domain/lifecycle recovery stays P0 because higher-level SCADA, integration and simulation are unsafe if command outcomes and physical recovery authority are ambiguous.
+The rebuilt repository is still materially behind those delivery baselines. Safe segmented physical progression is P0 because protocol adapters, SCADA and upstream orchestration must not be allowed to infer physical arrival from command dispatch alone.
 
 Priority after this PR is verified:
 
-1. complete lifecycle recovery/failover semantics and segmented MOVE with node confirmation/lookahead/incremental trusted release/reroute;
+1. dynamic reroute plus lifecycle recovery/failover authority integrated with segmented MOVE;
 2. adapter SDK plus Modbus TCP, OPC UA and VDA5050 boundaries;
 3. WMS/WES idempotent ingress and durable event delivery;
 4. alarm acknowledgement/recovery, operator modes and SSE/WebSocket;
