@@ -30,27 +30,34 @@ PR #4 restored segmented MOVE safety with CI PASS:
 - only trusted confirmation returns previous-node physical release authority;
 - UNKNOWN segment outcomes expose no further lookahead, do not advance position and cannot be blindly redispatched.
 
-## Current PR: safe dynamic reroute
+PR #5 restored fail-closed dynamic reroute with CI PASS:
 
-`feature/rebuild-safe-reroute` adds a fail-closed reroute boundary:
+- reroute is allowed only from quiescent READY state at the exact trusted confirmed node;
+- IN_FLIGHT and UNKNOWN commands cannot be reinterpreted as a replacement route;
+- deterministic regressions cover successful reroute and refusal boundaries.
 
-- reroute is allowed only while the segmented MOVE is quiescent in READY state;
-- an IN_FLIGHT command cannot be reinterpreted as a new route;
-- an UNKNOWN MOVE cannot be rerouted around, because physical outcome must be reconciled first;
-- replacement route origin must exactly equal the current trusted confirmed node;
-- deterministic regressions cover successful reroute after trusted confirmation, in-flight refusal, UNKNOWN refusal and origin mismatch.
+## Current PR: failover takeover fencing
 
-This PR does not yet claim failover takeover, compensation completion, adapter/protocol support, persistence or hardware SAT.
+`feature/rebuild-failover-fencing` adds explicit command-authority generations:
+
+- every physical dispatch is authorized against the current monotonically increasing control generation;
+- controller promotion advances the generation so stale controllers are fenced from future MOVE dispatch;
+- promotion is allowed only from quiescent READY state with a trusted confirmed node;
+- IN_FLIGHT and UNKNOWN physical outcomes refuse takeover until physical reconciliation;
+- failed takeover does not advance generation or mutate trusted position;
+- deterministic regressions cover stale-controller fencing, successful promotion, IN_FLIGHT refusal and UNKNOWN refusal.
+
+This PR does not yet claim durable lease persistence/consensus, compensation completion, adapter/protocol support or hardware SAT.
 
 ## Commercial benchmark delta
 
-Fresh public benchmark review on 2026-09-24 continues to support the control-first recovery order. GALAXIS RCS 3.0 combines planning, simulation, virtual commissioning, control, scheduling and O&M, including time-slot reservation and spatial conflict coordination. BlueSword IMHS-WCS/3D-SCADA emphasizes heterogeneous equipment control, material-position visibility and fault localization. Damon continues broad shuttle/AMR equipment coverage and publishes cloud-edge-device swarm/path scheduling. Quicktron exposes WES/LES/RCS integration with upstream WMS/ERP/MES and robot traffic/path control.
+Fresh public benchmark review on 2026-09-24 continues to support the control-first recovery order. GALAXIS RCS 3.0 integrates planning, simulation, virtual commissioning, control, scheduling and O&M with spatial conflict avoidance, time-slot reservation and dynamic reassignment. BlueSword IMHS-WCS/3D-SCADA combines heterogeneous equipment control, online/automatic/manual operations, material-position visibility and component-level fault localization. Damon publishes cloud-edge-device four-way shuttle/AMR swarm scheduling with conflict-free route generation. Quicktron exposes WES/LES/RCS integration with WMS/ERP/MES and robot path/traffic control.
 
-The rebuilt repository remains materially behind these commercial baselines. Safe reroute is P0 because mature schedulers dynamically reassign work, but commercial-wcs must never turn dynamic optimization into permission to reinterpret an unresolved physical command.
+The rebuilt repository remains materially behind these commercial baselines. Explicit takeover fencing remains P0: HA cannot be considered safe if an old controller can continue issuing physical MOVE commands after a replacement controller is promoted.
 
 Priority after this PR is verified:
 
-1. lifecycle recovery/failover authority integrated with segmented MOVE, including explicit takeover fencing;
+1. durable failover authority plus compensation completion integrated with task lifecycle;
 2. adapter SDK plus Modbus TCP, OPC UA and VDA5050 boundaries;
 3. WMS/WES idempotent ingress and durable event delivery;
 4. alarm acknowledgement/recovery, operator modes and SSE/WebSocket;
