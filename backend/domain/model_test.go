@@ -51,7 +51,7 @@ func TestCompensationCompletionRequiresFreshTrustedPosition(t *testing.T) {
 	if err := task.CompleteCompensation(Device{ID: "d1", PositionTrusted: true}); err == nil {
 		t.Fatal("empty position must not complete cancellation")
 	}
-	if err := task.CompleteCompensation(Device{ID: "d1", Position: "SAFE", PositionTrusted: true}); err != nil { t.Fatal(err) }
+	if err := task.CompleteCompensation(Device{ID: "d1", Position: "SAFE", PositionTrusted: true, UpdatedAt: time.Now()}); err != nil { t.Fatal(err) }
 	if task.State != TaskCancelled { t.Fatalf("state=%s", task.State) }
 }
 
