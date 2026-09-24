@@ -47,6 +47,7 @@ const (
 	TaskRunning TaskState = "RUNNING"
 	TaskCancelRequested TaskState = "CANCEL_REQUESTED"
 	TaskCompensating TaskState = "COMPENSATING"
+	TaskCancelled TaskState = "CANCELLED"
 	TaskFailed TaskState = "FAILED"
 	TaskCompleted TaskState = "COMPLETED"
 	TaskUnknown TaskState = "UNKNOWN"
@@ -130,5 +131,21 @@ func (t *Task) BeginCompensation(device Device) error {
 		return errors.New("trusted physical position required")
 	}
 	t.State = TaskCompensating
+	return nil
+}
+
+// CompleteCompensation is a second physical-state gate. A compensation command
+// being issued or acknowledged is not enough to declare cancellation complete:
+// the controller must reconcile a trusted, non-empty device position after the
+// compensation action. This keeps occupied-resource release decisions separate
+// from transport/command acknowledgements.
+func (t *Task) CompleteCompensation(device Device) error {
+	if t.State != TaskCompensating {
+		return errors.New("task is not compensating")
+	}
+	if !device.PositionTrusted || device.Position == "" {
+		return errors.New("trusted physical position required to complete compensation")
+	}
+	t.State = TaskCancelled
 	return nil
 }
