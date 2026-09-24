@@ -8,62 +8,43 @@ The GitHub repository was recreated on 2026-09-24. Acceptance is based only on c
 
 ## Verified on main
 
-PR #2 restored the first control safety kernel with CI PASS:
+PR #2 restored atomic resource reservation, deterministic wait-for/deadlock detection, trusted-position physical-resource release, and CI.
 
-- atomic all-or-none resource reservation;
-- deterministic wait-for/deadlock detection;
-- trusted device-position confirmation as the only physical-resource release path;
-- Go test/vet plus frontend build CI.
+PR #3 restored Device / Task / Alarm models, AUTO/MANUAL/MAINTENANCE modes, deadline/bounded retry, UNKNOWN MOVE no-replay, cancellation-as-request, and trusted-position compensation/recovery gates.
 
-PR #3 restored the production domain/lifecycle boundary with CI PASS:
+PR #4 restored segmented MOVE safety: one physical segment at a time, exact trusted destination confirmation, two-segment lookahead, trusted release authority, and UNKNOWN fail-closed behavior.
 
-- Device / Task / Alarm models and AUTO/MANUAL/MAINTENANCE device modes;
-- deadline and bounded retry semantics;
-- UNKNOWN MOVE is non-retryable;
-- cancellation is a request rather than a physical-state rewrite;
-- compensation/recovery requires trusted non-empty physical position.
+PR #5 restored fail-closed dynamic reroute: only quiescent READY state at the exact trusted confirmed node may reroute; IN_FLIGHT and UNKNOWN cannot be reinterpreted as a replacement route.
 
-PR #4 restored segmented MOVE safety with CI PASS:
+PR #6 restored explicit failover takeover fencing with CI PASS: monotonic command-authority generations, stale-controller dispatch rejection, and takeover refusal for IN_FLIGHT/UNKNOWN physical execution.
 
-- one physical segment is dispatched at a time and exact trusted destination confirmation gates progression;
-- two-segment destination lookahead supports atomic reservation;
-- only trusted confirmation returns previous-node physical release authority;
-- UNKNOWN segment outcomes expose no further lookahead, do not advance position and cannot be blindly redispatched.
+## Current PR: durable failover authority boundary
 
-PR #5 restored fail-closed dynamic reroute with CI PASS:
+`feature/durable-failover-authority` adds an AuthorityStore CAS contract and a restorable DurableControlLease:
 
-- reroute is allowed only from quiescent READY state at the exact trusted confirmed node;
-- IN_FLIGHT and UNKNOWN commands cannot be reinterpreted as a replacement route;
-- deterministic regressions cover successful reroute and refusal boundaries.
+- controller restart restores the last authority generation rather than resetting fencing state;
+- promotion persists generation advancement with compare-and-swap before exposing new authority;
+- competing controllers restored from the same generation cannot both promote successfully;
+- every authorization checks both the controller's cached generation and current store generation, so authority advanced elsewhere fences stale dispatch;
+- physical promotion remains gated by quiescent READY state and trusted confirmed position.
 
-## Current PR: failover takeover fencing
-
-`feature/rebuild-failover-fencing` adds explicit command-authority generations:
-
-- every physical dispatch is authorized against the current monotonically increasing control generation;
-- controller promotion advances the generation so stale controllers are fenced from future MOVE dispatch;
-- promotion is allowed only from quiescent READY state with a trusted confirmed node;
-- IN_FLIGHT and UNKNOWN physical outcomes refuse takeover until physical reconciliation;
-- failed takeover does not advance generation or mutate trusted position;
-- deterministic regressions cover stale-controller fencing, successful promotion, IN_FLIGHT refusal and UNKNOWN refusal.
-
-This PR does not yet claim durable lease persistence/consensus, compensation completion, adapter/protocol support or hardware SAT.
+The included MemoryAuthorityStore is deterministic test/simulation evidence for the CAS contract, not a claim of production durability. A PostgreSQL/consensus-backed AuthorityStore and multi-process/host failover tests remain required before HA is accepted for commercial delivery.
 
 ## Commercial benchmark delta
 
-Fresh public benchmark review on 2026-09-24 continues to support the control-first recovery order. GALAXIS RCS 3.0 integrates planning, simulation, virtual commissioning, control, scheduling and O&M with spatial conflict avoidance, time-slot reservation and dynamic reassignment. BlueSword IMHS-WCS/3D-SCADA combines heterogeneous equipment control, online/automatic/manual operations, material-position visibility and component-level fault localization. Damon publishes cloud-edge-device four-way shuttle/AMR swarm scheduling with conflict-free route generation. Quicktron exposes WES/LES/RCS integration with WMS/ERP/MES and robot path/traffic control.
+Fresh public benchmark review on 2026-09-24 continues to support the control-first recovery order. BlueSword Pro-WCS publicly combines task/path coordination, 3D-SCADA component-level diagnosis and 99.9% availability, while VirtuSync covers simulation and virtual commissioning. Damon publishes cloud-edge-device shuttle/AMR coordination and conflict-free route generation. Quicktron exposes WES/LES/RCS integration with upstream WMS/ERP/MES plus traffic control, multi-robot collaboration, operations and simulation capabilities. GALAXIS remains a benchmark for layered WCS/RCS and large-scale robot coordination.
 
-The rebuilt repository remains materially behind these commercial baselines. Explicit takeover fencing remains P0: HA cannot be considered safe if an old controller can continue issuing physical MOVE commands after a replacement controller is promoted.
+The rebuilt repository remains materially behind these commercial baselines. Durable command authority is a prerequisite for credible HA, but the current PR intentionally stops at a storage/consensus abstraction plus deterministic CAS tests rather than pretending an in-memory store is production durability.
 
 Priority after this PR is verified:
 
-1. durable failover authority plus compensation completion integrated with task lifecycle;
+1. PostgreSQL-backed authority CAS and crash/restart integration test, plus compensation completion;
 2. adapter SDK plus Modbus TCP, OPC UA and VDA5050 boundaries;
 3. WMS/WES idempotent ingress and durable event delivery;
 4. alarm acknowledgement/recovery, operator modes and SSE/WebSocket;
 5. RBAC/audit/config versioning;
 6. SCADA/material tracking and deterministic twin/FAT/SAT;
-7. PostgreSQL/edge snapshot, observability, HA, deployment and backup/restore.
+7. edge snapshot, observability, HA deployment and backup/restore.
 
 ## Acceptance
 
