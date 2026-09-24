@@ -56,12 +56,12 @@ func (l *ControlLease) Promote(move *SegmentedMove) (uint64, error) {
 
 // DispatchNext authorizes the generation before issuing a physical segment.
 // This keeps stale controllers from dispatching after failover.
-func (l *ControlLease) DispatchNext(move *SegmentedMove, generation uint64) (Segment, error) {
+func (l *ControlLease) DispatchNext(move *SegmentedMove, generation uint64) (MoveSegment, error) {
 	if err := l.Authorize(generation); err != nil {
-		return Segment{}, err
+		return MoveSegment{}, err
 	}
 	if move == nil {
-		return Segment{}, ErrTakeoverUnsafeState
+		return MoveSegment{}, ErrTakeoverUnsafeState
 	}
 	return move.DispatchNext()
 }
