@@ -18,27 +18,29 @@ PR #5 restored fail-closed dynamic reroute: only quiescent READY state at the ex
 
 PR #6 restored explicit failover takeover fencing with CI PASS: monotonic command-authority generations, stale-controller dispatch rejection, and takeover refusal for IN_FLIGHT/UNKNOWN physical execution.
 
-## Current PR: durable failover authority boundary
+PR #7 added the AuthorityStore CAS contract and restorable DurableControlLease with CI PASS: restart restores generation, competing promotions cannot both win, and stale cached controllers are fenced against the current store generation. MemoryAuthorityStore remains test/simulation only; production PostgreSQL/consensus durability is still required.
 
-`feature/durable-failover-authority` adds an AuthorityStore CAS contract and a restorable DurableControlLease:
+## Current PR: compensation completion safety
 
-- controller restart restores the last authority generation rather than resetting fencing state;
-- promotion persists generation advancement with compare-and-swap before exposing new authority;
-- competing controllers restored from the same generation cannot both promote successfully;
-- every authorization checks both the controller's cached generation and current store generation, so authority advanced elsewhere fences stale dispatch;
-- physical promotion remains gated by quiescent READY state and trusted confirmed position.
+`feature/compensation-completion` closes the task-lifecycle gap after compensation begins:
 
-The included MemoryAuthorityStore is deterministic test/simulation evidence for the CAS contract, not a claim of production durability. A PostgreSQL/consensus-backed AuthorityStore and multi-process/host failover tests remain required before HA is accepted for commercial delivery.
+- adds an explicit CANCELLED terminal state rather than treating a compensation command as task completion;
+- CompleteCompensation is legal only from COMPENSATING;
+- cancellation completion requires a trusted, non-empty post-compensation physical position;
+- failed completion attempts do not mutate lifecycle state;
+- deterministic regressions cover untrusted/empty position refusal, valid completion, and wrong-state refusal.
+
+This does not claim that the compensated position is automatically safe for every device type. Device-specific safe-zone/interlock policy and physical SAT remain required before releasing protected resources or handing a device back to AUTO.
 
 ## Commercial benchmark delta
 
-Fresh public benchmark review on 2026-09-24 continues to support the control-first recovery order. BlueSword Pro-WCS publicly combines task/path coordination, 3D-SCADA component-level diagnosis and 99.9% availability, while VirtuSync covers simulation and virtual commissioning. Damon publishes cloud-edge-device shuttle/AMR coordination and conflict-free route generation. Quicktron exposes WES/LES/RCS integration with upstream WMS/ERP/MES plus traffic control, multi-robot collaboration, operations and simulation capabilities. GALAXIS remains a benchmark for layered WCS/RCS and large-scale robot coordination.
+Fresh public benchmark review on 2026-09-24 continues to support the control-first recovery order. GALAXIS RCS 3.0 integrates planning, simulation, virtual commissioning, control, scheduling and O&M with 2D/3D digital twin and spatial-temporal coordination. BlueSword Pro-WCS combines task/path coordination, real-time equipment monitoring, 3D-SCADA component-level diagnosis and 99.9% availability, while VirtuSync covers simulation and virtual commissioning. Damon publishes cloud-edge-device shuttle/AMR coordination with swarm scheduling and conflict-free route generation. Quicktron exposes WES/LES/RCS integration with WMS/ERP/MES plus traffic control, multi-robot collaboration, operations and simulation.
 
-The rebuilt repository remains materially behind these commercial baselines. Durable command authority is a prerequisite for credible HA, but the current PR intentionally stops at a storage/consensus abstraction plus deterministic CAS tests rather than pretending an in-memory store is production durability.
+The rebuilt repository remains materially behind these commercial baselines. The immediate safety gap is no longer just entering recovery safely: compensation must not be declared complete from a command acknowledgement without post-action physical reconciliation.
 
 Priority after this PR is verified:
 
-1. PostgreSQL-backed authority CAS and crash/restart integration test, plus compensation completion;
+1. PostgreSQL-backed authority CAS and crash/restart integration test; device-specific compensation safe-zone/interlock and AUTO handback;
 2. adapter SDK plus Modbus TCP, OPC UA and VDA5050 boundaries;
 3. WMS/WES idempotent ingress and durable event delivery;
 4. alarm acknowledgement/recovery, operator modes and SSE/WebSocket;
